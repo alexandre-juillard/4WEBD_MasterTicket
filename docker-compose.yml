@@ -1,0 +1,211 @@
+services:
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: masterticket-nginx
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - frontend
+      - user-service
+      - event-service-1
+      - event-service-2
+      - ticket-service-1
+      - ticket-service-2
+      - notification-service
+      - payment-service
+    networks:
+      - app-net
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: masterticket-rabbitmq
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    networks:
+      - app-net
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: masterticket-frontend
+    expose:
+      - "4173"
+    networks:
+      - app-net
+
+  user-service:
+    build:
+      context: ./backend/user-service
+      dockerfile: Dockerfile
+    container_name: masterticket-user-service
+    environment:
+      PORT: 3001
+      MONGODB_URI: mongodb://user-mongo:27017/user_service_db
+      JWT_SECRET: ${JWT_SECRET:-change_me_for_dev_only}
+      JWT_EXPIRES_IN: 1d
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672
+    depends_on:
+      - user-mongo
+      - rabbitmq
+    networks:
+      - app-net
+
+  event-service-1:
+    build:
+      context: ./backend/event-service
+      dockerfile: Dockerfile
+    container_name: masterticket-event-service-1
+    environment:
+      PORT: 3002
+      MONGODB_URI: mongodb://event-mongo:27017/event_service_db
+      JWT_SECRET: ${JWT_SECRET:-change_me_for_dev_only}
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY:-change_internal_key}
+    depends_on:
+      - event-mongo
+    networks:
+      - app-net
+
+  event-service-2:
+    build:
+      context: ./backend/event-service
+      dockerfile: Dockerfile
+    container_name: masterticket-event-service-2
+    environment:
+      PORT: 3002
+      MONGODB_URI: mongodb://event-mongo:27017/event_service_db
+      JWT_SECRET: ${JWT_SECRET:-change_me_for_dev_only}
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY:-change_internal_key}
+    depends_on:
+      - event-mongo
+    networks:
+      - app-net
+
+  ticket-service-1:
+    build:
+      context: ./backend/ticket-service
+      dockerfile: Dockerfile
+    container_name: masterticket-ticket-service-1
+    environment:
+      PORT: 3003
+      MONGODB_URI: mongodb://ticket-mongo:27017/ticket_service_db
+      JWT_SECRET: ${JWT_SECRET:-change_me_for_dev_only}
+      EVENT_SERVICE_URL: http://event-service-1:3002
+      PAYMENT_SERVICE_URL: http://payment-service:3005
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY:-change_internal_key}
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672
+    depends_on:
+      - ticket-mongo
+      - payment-service
+      - rabbitmq
+    networks:
+      - app-net
+
+  ticket-service-2:
+    build:
+      context: ./backend/ticket-service
+      dockerfile: Dockerfile
+    container_name: masterticket-ticket-service-2
+    environment:
+      PORT: 3003
+      MONGODB_URI: mongodb://ticket-mongo:27017/ticket_service_db
+      JWT_SECRET: ${JWT_SECRET:-change_me_for_dev_only}
+      EVENT_SERVICE_URL: http://event-service-1:3002
+      PAYMENT_SERVICE_URL: http://payment-service:3005
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY:-change_internal_key}
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672
+    depends_on:
+      - ticket-mongo
+      - payment-service
+      - rabbitmq
+    networks:
+      - app-net
+
+  notification-service:
+    build:
+      context: ./backend/notification-service
+      dockerfile: Dockerfile
+    container_name: masterticket-notification-service
+    environment:
+      PORT: 3004
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672
+      SMTP_HOST: ${SMTP_HOST:-smtp.mailtrap.io}
+      SMTP_PORT: ${SMTP_PORT:-2525}
+      SMTP_USER: ${SMTP_USER:-replace_mailtrap_user}
+      SMTP_PASS: ${SMTP_PASS:-replace_mailtrap_password}
+      SMTP_FROM: ${SMTP_FROM:-noreply@masterticket.local}
+    depends_on:
+      - rabbitmq
+    networks:
+      - app-net
+
+  payment-service:
+    build:
+      context: ./backend/payment-service
+      dockerfile: Dockerfile
+    container_name: masterticket-payment-service
+    environment:
+      PORT: 3005
+      MONGODB_URI: mongodb://payment-mongo:27017/payment_service_db
+      JWT_SECRET: ${JWT_SECRET:-change_me_for_dev_only}
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY:-change_internal_key}
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-sk_test_replace_with_your_key}
+      FRONTEND_SUCCESS_URL: http://localhost:8080/payment/success?session_id={CHECKOUT_SESSION_ID}
+      FRONTEND_CANCEL_URL: http://localhost:8080/payment/cancel
+      PAYMENT_BACKUP_CRON: "0 */6 * * *"
+      PAYMENT_BACKUP_DIR: /app/backups
+    volumes:
+      - payment-backups:/app/backups
+    depends_on:
+      - payment-mongo
+    networks:
+      - app-net
+
+  user-mongo:
+    image: mongo:7
+    container_name: masterticket-user-mongo
+    volumes:
+      - user-mongo-data:/data/db
+    networks:
+      - app-net
+
+  event-mongo:
+    image: mongo:7
+    container_name: masterticket-event-mongo
+    volumes:
+      - event-mongo-data:/data/db
+    networks:
+      - app-net
+
+  ticket-mongo:
+    image: mongo:7
+    container_name: masterticket-ticket-mongo
+    volumes:
+      - ticket-mongo-data:/data/db
+    networks:
+      - app-net
+
+  payment-mongo:
+    image: mongo:7
+    container_name: masterticket-payment-mongo
+    volumes:
+      - payment-mongo-data:/data/db
+    networks:
+      - app-net
+
+volumes:
+  user-mongo-data:
+  event-mongo-data:
+  ticket-mongo-data:
+  payment-mongo-data:
+  payment-backups:
+
+networks:
+  app-net:
+    driver: bridge

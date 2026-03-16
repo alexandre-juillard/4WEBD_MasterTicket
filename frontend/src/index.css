@@ -1,0 +1,258 @@
+:root {
+  font-family: 'Segoe UI', 'Helvetica Neue', sans-serif;
+  color: #1f2933;
+  background:
+    radial-gradient(circle at 15% 10%, #dce8f2 0%, transparent 35%),
+    radial-gradient(circle at 85% 0%, #f5efe6 0%, transparent 30%),
+    #f7f9fc;
+  line-height: 1.4;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+
+.app-shell {
+  min-height: 100vh;
+  animation: fadeIn 0.4s ease;
+}
+
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.9rem 1.5rem;
+  background: rgba(255, 255, 255, 0.88);
+  border-bottom: 1px solid #d8e0e8;
+  backdrop-filter: blur(7px);
+}
+
+.brand {
+  font-size: 1.1rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+nav {
+  display: flex;
+  gap: 1rem;
+}
+
+nav a {
+  padding: 0.35rem 0.7rem;
+  border-radius: 999px;
+  transition: background 0.2s ease;
+}
+
+nav a.active,
+nav a:hover {
+  background: #dbe8f5;
+}
+
+.auth-zone {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+}
+
+.user-name {
+  font-size: 0.9rem;
+  color: #526173;
+}
+
+.role-pill {
+  background: #264653;
+  color: #fff;
+  font-size: 0.75rem;
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+}
+
+.page-content {
+  padding: 1.5rem;
+  max-width: 1180px;
+  margin: 0 auto;
+}
+
+.home-grid {
+  display: grid;
+  grid-template-columns: 1.7fr 1fr;
+  gap: 1.2rem;
+}
+
+.event-list,
+.ticket-list {
+  display: grid;
+  gap: 0.9rem;
+}
+
+.event-card,
+.ticket-card,
+.form-card,
+.centered-panel {
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid #dbe3eb;
+  border-radius: 14px;
+  padding: 1rem;
+  box-shadow: 0 12px 30px -24px rgba(28, 42, 56, 0.45);
+}
+
+.event-card {
+  animation: cardReveal 0.35s ease;
+}
+
+.event-meta,
+.event-foot,
+.purchase-row,
+.split-inputs {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.6rem;
+}
+
+.event-meta,
+.event-foot {
+  color: #4b5b6e;
+  font-size: 0.92rem;
+  margin-top: 0.6rem;
+}
+
+.purchase-row {
+  margin-top: 0.9rem;
+}
+
+input,
+textarea,
+select,
+button {
+  border-radius: 10px;
+  border: 1px solid #cfd8e1;
+  padding: 0.55rem 0.7rem;
+  transition: border-color 0.2s ease, transform 0.2s ease;
+}
+
+textarea {
+  min-height: 90px;
+  resize: vertical;
+}
+
+input:focus,
+textarea:focus,
+select:focus {
+  outline: none;
+  border-color: #4d7298;
+}
+
+button {
+  background: #264653;
+  color: #fff;
+  border: none;
+  cursor: pointer;
+}
+
+button:hover {
+  transform: translateY(-1px);
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+  transform: none;
+}
+
+.centered-panel {
+  max-width: 420px;
+  margin: 1.8rem auto;
+}
+
+.form-card {
+  display: grid;
+  gap: 0.65rem;
+}
+
+.notification-stack {
+  position: fixed;
+  right: 1rem;
+  bottom: 1rem;
+  display: grid;
+  gap: 0.5rem;
+  width: min(360px, 94vw);
+}
+
+.notification {
+  text-align: left;
+  border: none;
+  padding: 0.8rem;
+  border-radius: 10px;
+}
+
+.notification.success {
+  background: #2a9d8f;
+  color: #fff;
+}
+
+.notification.error {
+  background: #d1495b;
+  color: #fff;
+}
+
+.notification.info {
+  background: #4d7298;
+  color: #fff;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes cardReveal {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (max-width: 980px) {
+  .home-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .topbar {
+    flex-wrap: wrap;
+    gap: 0.7rem;
+  }
+
+  .auth-zone {
+    width: 100%;
+    justify-content: flex-end;
+  }
+}
