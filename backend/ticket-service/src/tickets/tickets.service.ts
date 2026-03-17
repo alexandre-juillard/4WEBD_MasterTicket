@@ -1,4 +1,5 @@
 import {
+  BadGatewayException,
   BadRequestException,
   ConflictException,
   ForbiddenException,
@@ -41,7 +42,7 @@ export class TicketsService {
     @InjectModel(Ticket.name) private readonly ticketModel: Model<TicketDocument>,
     private readonly configService: ConfigService,
     private readonly rabbitPublisher: RabbitPublisher,
-  ) {}
+  ) { }
 
   private get eventServiceUrl() {
     return this.configService.getOrThrow<string>('EVENT_SERVICE_URL');
@@ -56,10 +57,23 @@ export class TicketsService {
   }
 
   async startCheckout(startCheckoutDto: StartCheckoutDto, user: JwtPayload) {
-    const eventResponse = await axios.get<EventSummary>(
-      `${this.eventServiceUrl}/api/events/${startCheckoutDto.eventId}`,
-    );
-    const event = eventResponse.data;
+    let event: EventSummary;
+
+    try {
+      const eventResponse = await axios.get<EventSummary>(
+        `${this.eventServiceUrl}/api/events/${startCheckoutDto.eventId}`,
+      );
+      event = eventResponse.data;
+    } catch (error) {
+      if (axios.isAxiosError(error)) {
+        const message =
+          (error.response?.data as { message?: string | string[] } | undefined)?.message ??
+          'Unable to fetch event before checkout';
+        throw new BadGatewayException(Array.isArray(message) ? message.join(', ') : message);
+      }
+
+      throw new BadGatewayException('Unable to fetch event before checkout');
+    }
 
     if (!event) {
       throw new NotFoundException('Event not found');
@@ -69,22 +83,33 @@ export class TicketsService {
       throw new ConflictException('Not enough remaining seats');
     }
 
-    const checkoutResponse = await axios.post(
-      `${this.paymentServiceUrl}/api/payments/checkout-session`,
-      {
-        eventId: event._id,
-        eventTitle: event.title,
-        quantity: startCheckoutDto.quantity,
-        unitPrice: event.ticketPrice,
-      },
-      {
-        headers: {
-          Authorization: `Bearer ${user.token}`,
+    try {
+      const checkoutResponse = await axios.post(
+        `${this.paymentServiceUrl}/api/payments/checkout-session`,
+        {
+          eventId: event._id,
+          eventTitle: event.title,
+          quantity: startCheckoutDto.quantity,
+          unitPrice: event.ticketPrice,
         },
-      },
-    );
+        {
+          headers: {
+            Authorization: `Bearer ${user.token}`,
+          },
+        },
+      );
 
-    return checkoutResponse.data;
+      return checkoutResponse.data;
+    } catch (error) {
+      if (axios.isAxiosError(error)) {
+        const message =
+          (error.response?.data as { message?: string | string[] } | undefined)?.message ??
+          'Checkout initialization failed';
+        throw new BadGatewayException(Array.isArray(message) ? message.join(', ') : message);
+      }
+
+      throw new BadGatewayException('Checkout initialization failed');
+    }
   }
 
   async confirmPurchase(confirmPurchaseDto: ConfirmPurchaseDto, user: JwtPayload) {

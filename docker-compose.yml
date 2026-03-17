@@ -199,6 +199,62 @@ services:
     networks:
       - app-net
 
+  mongo-express-user:
+    image: mongo-express:1.0.2
+    container_name: masterticket-mongo-express-user
+    ports:
+      - "8081:8081"
+    environment:
+      ME_CONFIG_MONGODB_URL: mongodb://user-mongo:27017/user_service_db
+      ME_CONFIG_BASICAUTH_USERNAME: ${MONGO_EXPRESS_USERNAME:-admin}
+      ME_CONFIG_BASICAUTH_PASSWORD: ${MONGO_EXPRESS_PASSWORD:-admin}
+    depends_on:
+      - user-mongo
+    networks:
+      - app-net
+
+  mongo-express-event:
+    image: mongo-express:1.0.2
+    container_name: masterticket-mongo-express-event
+    ports:
+      - "8082:8081"
+    environment:
+      ME_CONFIG_MONGODB_URL: mongodb://event-mongo:27017/event_service_db
+      ME_CONFIG_BASICAUTH_USERNAME: ${MONGO_EXPRESS_USERNAME:-admin}
+      ME_CONFIG_BASICAUTH_PASSWORD: ${MONGO_EXPRESS_PASSWORD:-admin}
+    depends_on:
+      - event-mongo
+    networks:
+      - app-net
+
+  mongo-express-ticket:
+    image: mongo-express:1.0.2
+    container_name: masterticket-mongo-express-ticket
+    ports:
+      - "8083:8081"
+    environment:
+      ME_CONFIG_MONGODB_URL: mongodb://ticket-mongo:27017/ticket_service_db
+      ME_CONFIG_BASICAUTH_USERNAME: ${MONGO_EXPRESS_USERNAME:-admin}
+      ME_CONFIG_BASICAUTH_PASSWORD: ${MONGO_EXPRESS_PASSWORD:-admin}
+    depends_on:
+      - ticket-mongo
+    networks:
+      - app-net
+
+  mongo-express-payment:
+    image: mongo-express:1.0.2
+    container_name: masterticket-mongo-express-payment
+    ports:
+      - "8084:8081"
+    environment:
+      ME_CONFIG_MONGODB_URL: mongodb://payment-mongo:27017/payment_service_db
+      ME_CONFIG_BASICAUTH_USERNAME: ${MONGO_EXPRESS_USERNAME:-admin}
+      ME_CONFIG_BASICAUTH_PASSWORD: ${MONGO_EXPRESS_PASSWORD:-admin}
+    depends_on:
+      - payment-mongo
+    networks:
+      - app-net
+
 volumes:
   user-mongo-data:
   event-mongo-data:

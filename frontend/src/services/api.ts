@@ -56,7 +56,7 @@ export function loginUser(payload: { email: string; password: string }) {
 }
 
 export function fetchEvents() {
-  return apiRequest<EventItem[]>('/api/events');
+  return apiRequest<EventItem[]>('/api/events/');
 }
 
 export function createEvent(
@@ -71,7 +71,7 @@ export function createEvent(
     ticketPrice: number;
   },
 ) {
-  return apiRequest<EventItem>('/api/events', {
+  return apiRequest<EventItem>('/api/events/', {
     method: 'POST',
     token,
     body: payload,

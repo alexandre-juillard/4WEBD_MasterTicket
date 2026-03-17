@@ -92,6 +92,7 @@ Swagger: /api/notifications/docs
    - INTERNAL_API_KEY
    - STRIPE_SECRET_KEY
    - SMTP_HOST / SMTP_PORT / SMTP_USER / SMTP_PASS / SMTP_FROM
+   - MONGO_EXPRESS_USERNAME / MONGO_EXPRESS_PASSWORD
 
 3. Start all services:
 
@@ -101,6 +102,15 @@ Swagger: /api/notifications/docs
 
    - Frontend and API gateway: http://localhost:8080
    - RabbitMQ management: http://localhost:15672 (guest / guest)
+   - Mongo user DB UI: http://localhost:8081
+   - Mongo event DB UI: http://localhost:8082
+   - Mongo ticket DB UI: http://localhost:8083
+   - Mongo payment DB UI: http://localhost:8084
+
+5. Mongo Express login:
+
+   - Username: MONGO_EXPRESS_USERNAME
+   - Password: MONGO_EXPRESS_PASSWORD
 
 ## Stripe test mode quick guide
 

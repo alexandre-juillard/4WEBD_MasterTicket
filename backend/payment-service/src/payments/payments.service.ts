@@ -1,4 +1,9 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadGatewayException,
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
@@ -10,15 +15,27 @@ import { Payment, PaymentDocument, PaymentStatus } from './schemas/payment.schem
 @Injectable()
 export class PaymentsService {
   private readonly stripe: Stripe;
+  private readonly stripeSecretKey: string;
 
   constructor(
     @InjectModel(Payment.name) private readonly paymentModel: Model<PaymentDocument>,
     private readonly configService: ConfigService,
   ) {
-    this.stripe = new Stripe(configService.getOrThrow<string>('STRIPE_SECRET_KEY'));
+    this.stripeSecretKey = configService.getOrThrow<string>('STRIPE_SECRET_KEY');
+    this.stripe = new Stripe(this.stripeSecretKey);
+  }
+
+  private ensureStripeConfiguration(): void {
+    if (!this.stripeSecretKey.startsWith('sk_test_') || this.stripeSecretKey.includes('replace_with')) {
+      throw new BadRequestException(
+        'Stripe is not configured. Set a valid STRIPE_SECRET_KEY (sk_test_...) in root .env and restart Docker Compose.',
+      );
+    }
   }
 
   async createCheckoutSession(createCheckoutSessionDto: CreateCheckoutSessionDto, user: JwtPayload) {
+    this.ensureStripeConfiguration();
+
     const totalAmount = createCheckoutSessionDto.unitPrice * createCheckoutSessionDto.quantity;
     const successUrl = this.configService.get<string>(
       'FRONTEND_SUCCESS_URL',
@@ -29,32 +46,39 @@ export class PaymentsService {
       'http://localhost:5173/payment/cancel',
     );
 
-    const session = await this.stripe.checkout.sessions.create({
-      mode: 'payment',
-      payment_method_types: ['card'],
-      line_items: [
-        {
-          quantity: createCheckoutSessionDto.quantity,
-          price_data: {
-            currency: 'eur',
-            unit_amount: Math.round(createCheckoutSessionDto.unitPrice * 100),
-            product_data: {
-              name: `Concert ticket - ${createCheckoutSessionDto.eventTitle}`,
+    let session: Stripe.Checkout.Session;
+
+    try {
+      session = await this.stripe.checkout.sessions.create({
+        mode: 'payment',
+        payment_method_types: ['card'],
+        line_items: [
+          {
+            quantity: createCheckoutSessionDto.quantity,
+            price_data: {
+              currency: 'eur',
+              unit_amount: Math.round(createCheckoutSessionDto.unitPrice * 100),
+              product_data: {
+                name: `Concert ticket - ${createCheckoutSessionDto.eventTitle}`,
+              },
             },
           },
+        ],
+        metadata: {
+          userId: user.sub,
+          email: user.email,
+          eventId: createCheckoutSessionDto.eventId,
+          eventTitle: createCheckoutSessionDto.eventTitle,
+          quantity: String(createCheckoutSessionDto.quantity),
+          unitPrice: String(createCheckoutSessionDto.unitPrice),
         },
-      ],
-      metadata: {
-        userId: user.sub,
-        email: user.email,
-        eventId: createCheckoutSessionDto.eventId,
-        eventTitle: createCheckoutSessionDto.eventTitle,
-        quantity: String(createCheckoutSessionDto.quantity),
-        unitPrice: String(createCheckoutSessionDto.unitPrice),
-      },
-      success_url: successUrl,
-      cancel_url: cancelUrl,
-    });
+        success_url: successUrl,
+        cancel_url: cancelUrl,
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Stripe checkout failed';
+      throw new BadGatewayException(`Stripe checkout failed: ${message}`);
+    }
 
     await this.paymentModel.create({
       sessionId: session.id,

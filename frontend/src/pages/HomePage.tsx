@@ -180,27 +180,31 @@ export function HomePage() {
               required
             />
             <div className="split-inputs">
-              <input
-                type="number"
-                min={1}
-                placeholder="Seats"
-                value={formData.totalSeats}
-                onChange={(entry) =>
-                  setFormData((current) => ({ ...current, totalSeats: Number(entry.target.value) }))
-                }
-                required
-              />
-              <input
-                type="number"
-                min={0}
-                step="0.01"
-                placeholder="Price"
-                value={formData.ticketPrice}
-                onChange={(entry) =>
-                  setFormData((current) => ({ ...current, ticketPrice: Number(entry.target.value) }))
-                }
-                required
-              />
+              <label className="field-group">
+                <span>Maximum seats</span>
+                <input
+                  type="number"
+                  min={1}
+                  value={formData.totalSeats}
+                  onChange={(entry) =>
+                    setFormData((current) => ({ ...current, totalSeats: Number(entry.target.value) }))
+                  }
+                  required
+                />
+              </label>
+              <label className="field-group">
+                <span>Ticket price (EUR)</span>
+                <input
+                  type="number"
+                  min={0}
+                  step="0.01"
+                  value={formData.ticketPrice}
+                  onChange={(entry) =>
+                    setFormData((current) => ({ ...current, ticketPrice: Number(entry.target.value) }))
+                  }
+                  required
+                />
+              </label>
             </div>
             <button disabled={creatingEvent} type="submit">
               {creatingEvent ? 'Creating...' : 'Create event'}
