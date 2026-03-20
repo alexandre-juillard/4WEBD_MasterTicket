@@ -1,140 +1,264 @@
 # MasterTicket SaaS
 
-Microservices MVP for concert events and ticket sales.
+Plateforme microservices pour la gestion d'evenements et la vente de billets.
 
-## Stack
+## Choix technologiques
 
 - Backend: NestJS + TypeScript
 - Frontend: React + Vite + TypeScript
-- Databases: MongoDB (one database per service)
-- Broker: RabbitMQ (durable queue)
-- Load balancer / entrypoint: Nginx on port 8080
-- Payment: Stripe Checkout (test mode)
-- Email: Mailtrap SMTP
+- Bases de donnees: MongoDB (1 base par service)
+- Messagerie: RabbitMQ
+- Reverse proxy / point d'entree: Nginx (port 8080)
+- Paiement: Stripe Checkout (mode test)
+- Email: SMTP Mailtrap
 
-## Project layout
+## Objectifs du projet
 
-- /backend/user-service
-- /backend/event-service
-- /backend/ticket-service
-- /backend/notification-service
-- /backend/payment-service
-- /frontend
-- /nginx
-- /docker-compose.yml
+- Gerer des evenements (creation, mise a jour, suppression, consultation)
+- Permettre l'achat de billets avec confirmation de paiement
+- Gerer les roles applicatifs: Admin, EventCreator, Operator, User
+- Isoler chaque domaine metier en microservice
 
-## Core behavior
+## Composition du backend
 
-- Event read is public.
-- Ticket purchase is authenticated and linked to the authenticated user.
-- JWT is validated locally in each service using the shared JWT secret.
-- Frontend keeps the JWT in local storage so users do not need to re-login for every action.
-- RabbitMQ queues email notification messages. If notification service is down, messages remain queued and are consumed when it is up again.
+Le dossier `backend/` contient 5 microservices NestJS:
 
-## Services
+- `user-service`: inscription, connexion JWT, profil utilisateur, roles
+- `event-service`: gestion des evenements et des places disponibles
+- `ticket-service`: checkout, confirmation d'achat, tickets utilisateur, annulation
+- `payment-service`: creation/verifications de sessions Stripe + backup periodique
+- `notification-service`: consommation RabbitMQ + envoi email SMTP
 
-### User Service
+Composants transverses:
 
-- Register
-- Login (JWT)
-- Get profile
-- Delete profile
-- Roles: Admin, EventCreator, Operator, User
+- MongoDB: 1 instance par service metier de persistance
+- RabbitMQ: transport asynchrone pour les notifications
+- Nginx: entree unique et routage vers les APIs
+- Replicas Docker: `event-service` et `ticket-service` sont instancies en x2
 
-Swagger: /api/users/docs
+## Composition du frontend
 
-### Event Service
+Le dossier `frontend/` contient une SPA React:
 
-- Public list/details
-- Create/update/delete with role checks
-- Seat stock (remaining seats) management
-- Internal reserve/release endpoints for ticket flow
+- Routing principal dans `src/App.tsx`
+- Pages: accueil, login, register, mes billets, paiement succes, paiement annule
+- Contextes: authentification (`AuthContext`) + notifications UI (`NotificationContext`)
+- Service API centralise dans `src/services/api.ts`
+- Protection de route pour les pages authentifiees (`ProtectedRoute`)
 
-Swagger: /api/events/docs
+## Prerequis
 
-### Ticket Service
+### Execution avec Docker
 
-- Authenticated checkout start
-- Purchase confirmation from Stripe session
-- Unit unique ticket generation
-- User ticket listing
-- Ticket cancellation (seat released, no refund)
+- Docker Desktop (ou Docker Engine + Compose)
+- Port libres: 8080, 8081, 8082, 8083, 8084, 15672
+- Fichier d'environnement racine:
 
-Swagger: /api/tickets/docs
+PowerShell:
 
-### Payment Service
+```powershell
+Copy-Item .env.example .env
+```
 
-- Stripe checkout session creation (test mode)
-- Internal payment session verification
-- Payment records by user
-- Scheduled JSON backup for payment DB snapshots
+Linux (bash):
 
-Swagger: /api/payments/docs
+```bash
+cp .env.example .env
+```
 
-### Notification Service
+Variables a renseigner dans `.env`:
 
-- RabbitMQ consumer on notifications.email queue
-- Mailtrap SMTP email dispatch
-- Health endpoint
+- `JWT_SECRET`
+- `INTERNAL_API_KEY`
+- `STRIPE_SECRET_KEY`
+- `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM`
+- `MONGO_EXPRESS_USERNAME`, `MONGO_EXPRESS_PASSWORD`
 
-Swagger: /api/notifications/docs
+### Execution en local sans Docker
 
-## Run with Docker
+- Node.js 20+ et npm
+- MongoDB en local (bases: `user_service_db`, `event_service_db`, `ticket_service_db`, `payment_service_db`)
+- RabbitMQ en local (broker AMQP)
+- Compte Stripe en mode test
+- Compte SMTP (Mailtrap ou equivalent)
+- Copier les fichiers d'environnement de chaque service:
 
-1. Copy root env template:
+PowerShell:
 
-   - Windows PowerShell:
-     - Copy-Item .env.example .env
+```powershell
+Copy-Item backend/user-service/.env.example backend/user-service/.env
+Copy-Item backend/event-service/.env.example backend/event-service/.env
+Copy-Item backend/ticket-service/.env.example backend/ticket-service/.env
+Copy-Item backend/notification-service/.env.example backend/notification-service/.env
+Copy-Item backend/payment-service/.env.example backend/payment-service/.env
+```
 
-2. Update .env values:
+Linux (bash):
 
-   - JWT_SECRET
-   - INTERNAL_API_KEY
-   - STRIPE_SECRET_KEY
-   - SMTP_HOST / SMTP_PORT / SMTP_USER / SMTP_PASS / SMTP_FROM
-   - MONGO_EXPRESS_USERNAME / MONGO_EXPRESS_PASSWORD
+```bash
+cp backend/user-service/.env.example backend/user-service/.env
+cp backend/event-service/.env.example backend/event-service/.env
+cp backend/ticket-service/.env.example backend/ticket-service/.env
+cp backend/notification-service/.env.example backend/notification-service/.env
+cp backend/payment-service/.env.example backend/payment-service/.env
+```
 
-3. Start all services:
+Points importants pour le mode local:
 
-   - docker compose up --build
+- Adapter les `MONGODB_URI` vers votre Mongo local (ex: `mongodb://localhost:27017/<db_name>`)
+- Adapter les `RABBITMQ_URL` vers votre RabbitMQ local (ex: `amqp://guest:guest@localhost:5672`)
+- Adapter `EVENT_SERVICE_URL` et `PAYMENT_SERVICE_URL` dans `ticket-service/.env`
+- Renseigner `STRIPE_SECRET_KEY` et les variables SMTP
+- Le frontend Vite proxy `/api` vers `http://localhost:8080` (un reverse proxy local doit donc etre disponible sur ce port)
 
-4. Access app:
+## Commande de lancement avec Docker
 
-   - Frontend and API gateway: http://localhost:8080
-   - RabbitMQ management: http://localhost:15672 (guest / guest)
-   - Mongo user DB UI: http://localhost:8081
-   - Mongo event DB UI: http://localhost:8082
-   - Mongo ticket DB UI: http://localhost:8083
-   - Mongo payment DB UI: http://localhost:8084
+Depuis la racine du projet:
 
-5. Mongo Express login:
+```bash
+docker compose up --build
+```
 
-   - Username: MONGO_EXPRESS_USERNAME
-   - Password: MONGO_EXPRESS_PASSWORD
+## Commandes de lancement en local sans Docker
 
-## Stripe test mode quick guide
+### 1) Installer les dependances
 
-1. Create a Stripe account and enable test mode.
-2. Get your Secret key (starts with sk_test_) and set STRIPE_SECRET_KEY in .env.
-3. Start the stack with docker compose up --build.
-4. Register/login from the UI.
-5. Open Events, choose quantity, click Buy ticket(s).
-6. Stripe Checkout opens; use Stripe test card:
-   - Card: 4242 4242 4242 4242
-   - Expiry: any future date
-   - CVC: any 3 digits
-7. After payment success, Stripe redirects to /payment/success, then ticket confirmation is performed and unique tickets are generated.
+PowerShell:
 
-## Local development (without Docker)
+```powershell
+Set-Location backend/user-service; npm install
+Set-Location ../event-service; npm install
+Set-Location ../ticket-service; npm install
+Set-Location ../notification-service; npm install
+Set-Location ../payment-service; npm install
+Set-Location ../../frontend; npm install
+```
 
-- Each service has its own package.json and .env.example.
-- Install dependencies in each service and in frontend.
-- Start services independently with npm run start:dev.
-- Start frontend with npm run dev.
+Linux (bash):
 
-## Notes
+```bash
+cd backend/user-service && npm install
+cd ../event-service && npm install
+cd ../ticket-service && npm install
+cd ../notification-service && npm install
+cd ../payment-service && npm install
+cd ../../frontend && npm install
+```
 
-- This is an MVP-oriented architecture, not production hardening.
-- Secrets are not hardcoded in source code.
-- Passwords are hashed with bcrypt.
-- Unit tests are included in each service.
+### 2) Lancer les services backend (1 terminal par service)
+
+PowerShell:
+
+```powershell
+Set-Location backend/user-service; npm run start:dev
+```
+
+Linux (bash):
+
+```bash
+cd backend/user-service && npm run start:dev
+```
+
+PowerShell:
+
+```powershell
+Set-Location backend/event-service; npm run start:dev
+```
+
+Linux (bash):
+
+```bash
+cd backend/event-service && npm run start:dev
+```
+
+PowerShell:
+
+```powershell
+Set-Location backend/ticket-service; npm run start:dev
+```
+
+Linux (bash):
+
+```bash
+cd backend/ticket-service && npm run start:dev
+```
+
+PowerShell:
+
+```powershell
+Set-Location backend/notification-service; npm run start:dev
+```
+
+Linux (bash):
+
+```bash
+cd backend/notification-service && npm run start:dev
+```
+
+PowerShell:
+
+```powershell
+Set-Location backend/payment-service; npm run start:dev
+```
+
+Linux (bash):
+
+```bash
+cd backend/payment-service && npm run start:dev
+```
+
+### 3) Lancer le frontend
+
+PowerShell:
+
+```powershell
+Set-Location frontend; npm run dev
+```
+
+Linux (bash):
+
+```bash
+cd frontend && npm run dev
+```
+
+## URLs utiles et configuration des credentials
+
+### URLs en mode Docker
+
+- Application + gateway Nginx: `http://localhost:8080`
+- Swagger User API: `http://localhost:8080/api/users/docs`
+- Swagger Event API: `http://localhost:8080/api/events/docs`
+- Swagger Ticket API: `http://localhost:8080/api/tickets/docs`
+- Swagger Payment API: `http://localhost:8080/api/payments/docs`
+- Swagger Notification API: `http://localhost:8080/api/notifications/docs`
+- RabbitMQ Management: `http://localhost:15672`
+- Mongo Express User: `http://localhost:8081`
+- Mongo Express Event: `http://localhost:8082`
+- Mongo Express Ticket: `http://localhost:8083`
+- Mongo Express Payment: `http://localhost:8084`
+
+Credentials Docker:
+
+- RabbitMQ Management: `guest / guest` (dans `docker-compose.yml`)
+- Mongo Express: `MONGO_EXPRESS_USERNAME / MONGO_EXPRESS_PASSWORD` (dans `.env` racine)
+- SMTP, Stripe, JWT, cle API interne: dans `.env` racine
+
+### URLs en mode local sans Docker
+
+- Frontend Vite: `http://localhost:5173`
+- User service: `http://localhost:3001` (docs: `/api/users/docs`)
+- Event service: `http://localhost:3002` (docs: `/api/events/docs`)
+- Ticket service: `http://localhost:3003` (docs: `/api/tickets/docs`)
+- Notification service: `http://localhost:3004` (docs: `/api/notifications/docs`)
+- Payment service: `http://localhost:3005` (docs: `/api/payments/docs`)
+- RabbitMQ Management (si actif localement): `http://localhost:15672`
+
+Credentials local:
+
+- Se paramettrent dans chaque fichier `.env` de service (`backend/*-service/.env`)
+- MongoDB: via `MONGODB_URI`
+- RabbitMQ: via `RABBITMQ_URL`
+- Communication inter-services: `INTERNAL_API_KEY`, `EVENT_SERVICE_URL`, `PAYMENT_SERVICE_URL`
+- Auth/JWT: `JWT_SECRET`, `JWT_EXPIRES_IN`
+- Paiement Stripe: `STRIPE_SECRET_KEY`, `FRONTEND_SUCCESS_URL`, `FRONTEND_CANCEL_URL`
+- Email SMTP: `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM`
